@@ -1,50 +1,67 @@
 # Source: EDF Open Data - Nuclear power plants
-# https://opendata.edf.fr/explore/dataset/centrales-de-production-nucleaire-edf
+# URL: https://opendata.edf.fr/explore/dataset/centrales-de-production-nucleaire-edf
 
-import math
+import numpy as np
 import pandas as pd
 import requests
+from schema import SCHEMA
 
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
-    return 2 * R * math.asin(math.sqrt(a))
+def load_nuclear_plants():
+    """Fetch and extract unique nuclear power plant coordinates from EDF API."""
+    url = "https://opendata.edf.fr/api/explore/v2.1/catalog/datasets/centrales-de-production-nucleaire-edf/exports/geojson?lang=fr&timezone=Europe%2FParis"
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    data = response.json()
 
-def nearest_plant_distance(lat, lon, plants):
-    return round(min(haversine(lat, lon, p['lat'], p['lon']) for p in plants), 1)
+    plants_dict = {}
+    for feature in data.get('features', []):
+        coords = feature['geometry']['coordinates']
+        name = feature['properties']['centrale']
+        if name not in plants_dict:
+            plants_dict[name] = {'name': name, 'lon': coords[0], 'lat': coords[1]}
 
-# Load schema
-df = pd.read_parquet('parquets/france_h3_schema.parquet')
-print(f"Schema loaded: {len(df)} hexagons")
+    return list(plants_dict.values())
 
-# Load nuclear plants
-url = "https://opendata.edf.fr/api/explore/v2.1/catalog/datasets/centrales-de-production-nucleaire-edf/exports/geojson?lang=fr&timezone=Europe%2FParis"
-response = requests.get(url, timeout=30)
-data = response.json()
+def compute_min_distances_vectorized(df_lats, df_lons, plants):
+    """Compute minimal Haversine distance for all grid points using NumPy broadcasting."""
+    if not plants:
+        raise ValueError("No nuclear plant data available.")
 
-plants_dict = {}
-for feature in data['features']:
-    coords = feature['geometry']['coordinates']
-    name = feature['properties']['centrale']
-    if name not in plants_dict:
-        plants_dict[name] = {'name': name, 'lon': coords[0], 'lat': coords[1]}
+    p_lats = np.array([p['lat'] for p in plants])
+    p_lons = np.array([p['lon'] for p in plants])
 
-plants = list(plants_dict.values())
-print(f"{len(plants)} unique plants loaded")
+    df_lats_r = np.radians(df_lats.values)[:, np.newaxis]
+    df_lons_r = np.radians(df_lons.values)[:, np.newaxis]
+    p_lats_r = np.radians(p_lats)[np.newaxis, :]
+    p_lons_r = np.radians(p_lons)[np.newaxis, :]
 
-# Compute distances
-print("Computing distances...")
-distances = []
-for i, row in df.iterrows():
-    if i % 1000 == 0:
-        print(f"  {i}/{len(df)}...")
-    distances.append(nearest_plant_distance(row['lat'], row['lon'], plants))
+    dlat = p_lats_r - df_lats_r
+    dlon = p_lons_r - df_lons_r
 
-df['nuclear_plant_distance_km'] = distances
+    a = np.sin(dlat / 2.0)**2 + np.cos(df_lats_r) * np.cos(p_lats_r) * np.sin(dlon / 2.0)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    km = 6371.0 * c
 
-# Save
-df.to_parquet('parquets/france_h3_nuclear.parquet', index=False)
-print(f"✅ Saved: parquets/france_h3_nuclear.parquet")
+    return np.round(np.min(km, axis=1), 1)
+
+def main():
+    input_file = 'parquets/fr/base_grid.parquet'
+    output_file = 'parquets/fr/h3_nuclear.parquet'
+
+    df = pd.read_parquet(input_file)
+    plants = load_nuclear_plants()
+    
+    distances = compute_min_distances_vectorized(df['lat'], df['lon'], plants)
+
+    out_df = pd.DataFrame({
+        'h3_index': df['h3_index'],
+        'nuclear_plant_distance_km': distances
+    })
+
+    out_df['h3_index'] = out_df['h3_index'].astype(SCHEMA['h3_index'])
+    out_df['nuclear_plant_distance_km'] = out_df['nuclear_plant_distance_km'].astype(SCHEMA['nuclear_plant_distance_km'])
+
+    out_df.to_parquet(output_file, index=False)
+
+if __name__ == "__main__":
+    main()
