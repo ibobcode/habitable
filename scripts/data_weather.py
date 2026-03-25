@@ -1,5 +1,5 @@
 # Source: Météo-France - Monthly climatological data
-# https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-mensuelles
+# URL: https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-mensuelles
 
 import io
 import gzip
@@ -7,142 +7,135 @@ import requests
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
+from schema import SCHEMA
 
-# Load schema
-df = pd.read_parquet('parquets/france_h3_schema.parquet')
-print(f"Schema loaded: {len(df)} hexagons")
+def load_weather_data():
+    dataset_id = "donnees-climatologiques-de-base-mensuelles"
+    api_url = f"https://www.data.gouv.fr/api/1/datasets/{dataset_id}/"
+    resources = requests.get(api_url).json()['resources']
 
-# Fetch file list from data.gouv.fr API
-dataset_id = "donnees-climatologiques-de-base-mensuelles"
-api_url = f"https://www.data.gouv.fr/api/1/datasets/{dataset_id}/"
-resources = requests.get(api_url).json()['resources']
+    METRO_DEPTS = [str(i).zfill(2) for i in range(1, 96)] + ['2A', '2B']
+    files = [
+        r for r in resources
+        if 'periode_1950-2024' in r['title']
+        and 'MENS_departement' in r['title']
+        and any(f'departement_{d}_' in r['title'] for d in METRO_DEPTS)
+    ]
 
-# Filter metropolitan France departments 1950-2024
-METRO_DEPTS = [str(i).zfill(2) for i in range(1, 96)] + ['2A', '2B']
-files = [
-    r for r in resources
-    if 'periode_1950-2024' in r['title']
-    and 'MENS_departement' in r['title']
-    and any(f'departement_{d}_' in r['title'] for d in METRO_DEPTS)
-]
-print(f"{len(files)} department files found")
+    dfs = []
+    for f in files:
+        r = requests.get(f['url'], timeout=30)
+        with gzip.open(io.BytesIO(r.content)) as gz:
+            dfs.append(pd.read_csv(gz, sep=';', dtype=str))
 
-# Download and concatenate
-dfs = []
-for i, f in enumerate(files):
-    print(f"  {i+1}/{len(files)} - {f['title'][:50]}")
-    r = requests.get(f['url'], timeout=30)
-    with gzip.open(io.BytesIO(r.content)) as gz:
-        dfs.append(pd.read_csv(gz, sep=';', dtype=str))
+    return pd.concat(dfs, ignore_index=True)
 
-raw = pd.concat(dfs, ignore_index=True)
-print(f"Raw data: {len(raw)} rows")
-
-# Keep useful columns
-cols = ['NUM_POSTE', 'LAT', 'LON', 'AAAAMM',
-        'RR', 'TM', 'TN', 'TX', 'INST',
-        'NBJRR1', 'NBJGELEE', 'NBJTX30']
-raw = raw[cols].copy()
-
-for col in ['LAT', 'LON', 'RR', 'TM', 'TN', 'TX', 'INST', 'NBJRR1', 'NBJGELEE', 'NBJTX30']:
-    raw[col] = pd.to_numeric(raw[col], errors='coerce')
-
-raw['year'] = raw['AAAAMM'].astype(str).str[:4].astype(int)
-raw['month'] = raw['AAAAMM'].astype(str).str[4:6].astype(int)
-raw = raw[raw['year'].isin([2023, 2024])]
-print(f"Filtered 2023-2024: {len(raw)} rows")
-
-# Assign seasons
 def get_season(month):
-    if month in [12, 1, 2]:  return 'winter'
-    if month in [3, 4, 5]:   return 'spring'
-    if month in [6, 7, 8]:   return 'summer'
+    if month in [12, 1, 2]: return 'winter'
+    if month in [3, 4, 5]:  return 'spring'
+    if month in [6, 7, 8]:  return 'summer'
     return 'autumn'
 
-raw['season'] = raw['month'].apply(get_season)
+def process_weather_data(raw):
+    cols = ['NUM_POSTE', 'LAT', 'LON', 'AAAAMM', 'RR', 'TM', 'TN', 'TX', 'INST', 'NBJRR1', 'NBJGELEE', 'NBJTX30']
+    raw = raw[cols].copy()
 
-# Aggregate by station and season
-by_season = raw.groupby(['NUM_POSTE', 'LAT', 'LON', 'season']).agg(
-    rainfall=('RR', 'mean'),
-    temperature=('TM', 'mean'),
-).reset_index()
+    numeric_cols = ['LAT', 'LON', 'RR', 'TM', 'TN', 'TX', 'INST', 'NBJRR1', 'NBJGELEE', 'NBJTX30']
+    for col in numeric_cols:
+        raw[col] = pd.to_numeric(raw[col], errors='coerce')
 
-by_year = raw.groupby(['NUM_POSTE', 'LAT', 'LON']).agg(
-    temp_min=('TN', 'min'),
-    temp_max=('TX', 'max'),
-    sunshine_hours=('INST', 'sum'),
-    rainy_days=('NBJRR1', 'sum'),
-    frost_days=('NBJGELEE', 'sum'),
-    hot_days=('NBJTX30', 'sum'),
-).reset_index()
+    raw['year'] = raw['AAAAMM'].astype(str).str[:4].astype(int)
+    raw['month'] = raw['AAAAMM'].astype(str).str[4:6].astype(int)
+    raw = raw[raw['year'].isin([2023, 2024])]
 
-# Replace 0 sunshine with NaN (stations without sensor)
-by_year['sunshine_hours'] = by_year['sunshine_hours'].replace(0, np.nan)
+    raw['season'] = raw['month'].apply(get_season)
 
-# Pivot seasons
-pivot = by_season.pivot_table(
-    index=['NUM_POSTE', 'LAT', 'LON'],
-    columns='season',
-    values=['rainfall', 'temperature']
-).reset_index()
-pivot.columns = ['_'.join(col).strip('_') if col[1] else col[0] for col in pivot.columns]
+    by_season = raw.groupby(['NUM_POSTE', 'LAT', 'LON', 'season']).agg(
+        rainfall=('RR', 'mean'),
+        temperature=('TM', 'mean'),
+    ).reset_index()
 
-stations = pivot.merge(by_year, on=['NUM_POSTE', 'LAT', 'LON'])
-stations = stations.dropna(subset=['LAT', 'LON'])
-print(f"{len(stations)} stations with data")
+    by_year = raw.groupby(['NUM_POSTE', 'LAT', 'LON']).agg(
+        temp_min=('TN', 'min'),
+        temp_max=('TX', 'max'),
+        sunshine_hours=('INST', 'sum'),
+        rainy_days=('NBJRR1', 'sum'),
+        frost_days=('NBJGELEE', 'sum'),
+        hot_days=('NBJTX30', 'sum'),
+    ).reset_index()
 
-# IDW interpolation
-def idw(tree, stations_df, lat, lon, k=8, power=2):
-    distances, indices = tree.query([[lat, lon]], k=k)
-    distances, indices = distances[0], indices[0]
-    if distances[0] == 0:
-        return np.ones(k) / k, indices
-    weights = 1 / (distances ** power)
-    weights /= weights.sum()
-    return weights, indices
+    by_year['sunshine_hours'] = by_year['sunshine_hours'].replace(0, np.nan)
 
-coords = stations[['LAT', 'LON']].values
-tree = cKDTree(coords)
+    pivot = by_season.pivot_table(
+        index=['NUM_POSTE', 'LAT', 'LON'],
+        columns='season',
+        values=['rainfall', 'temperature']
+    ).reset_index()
 
-COLUMNS = {
-    'rainfall_winter':    'rainfall_winter',
-    'rainfall_spring':    'rainfall_spring',
-    'rainfall_summer':    'rainfall_summer',
-    'rainfall_autumn':    'rainfall_autumn',
-    'temperature_winter': 'temperature_winter',
-    'temperature_spring': 'temperature_spring',
-    'temperature_summer': 'temperature_summer',
-    'temperature_autumn': 'temperature_autumn',
-    'temp_min':           'temp_min',
-    'temp_max':           'temp_max',
-    'sunshine_hours':     'sunshine_hours',
-    'rainy_days':         'rainy_days',
-    'frost_days':         'frost_days',
-    'hot_days':           'hot_days',
-}
+    pivot.columns = [f"{col[0]}_{col[1]}" if col[1] else col[0] for col in pivot.columns]
 
-print("Interpolating...")
-results = []
-for i, row in df.iterrows():
-    if i % 1000 == 0:
-        print(f"  {i}/{len(df)}...")
-    weights, indices = idw(tree, stations, row['lat'], row['lon'])
-    result = {'h3_index': row['h3_index']}
-    for col_out, col_in in COLUMNS.items():
-        vals = stations.iloc[indices][col_in].values
-        mask = ~np.isnan(vals)
-        if mask.sum() == 0:
-            result[col_out] = np.nan
-        else:
-            w = weights[mask] / weights[mask].sum()
-            result[col_out] = round(float(np.sum(w * vals[mask])), 2)
-    results.append(result)
+    stations = pivot.merge(by_year, on=['NUM_POSTE', 'LAT', 'LON'])
+    return stations.dropna(subset=['LAT', 'LON'])
 
-df_weather = pd.DataFrame(results)
-df_out = df.copy()
-for col in df_weather.columns:
-    if col != 'h3_index':
-        df_out[col] = df_out['h3_index'].map(df_weather.set_index('h3_index')[col])
+def apply_idw_vectorized(df, stations, k=8, power=2):
+    coords = stations[['LAT', 'LON']].values
+    tree = cKDTree(coords)
+    target_coords = df[['lat', 'lon']].values
 
-df_out.to_parquet('parquets/france_h3_weather.parquet', index=False)
-print(f"✅ Saved: parquets/france_h3_weather.parquet")
+    distances, indices = tree.query(target_coords, k=k)
+    distances = np.maximum(distances, 1e-9)
+    base_weights = 1.0 / (distances ** power)
+
+    columns_mapping = {
+        'rainfall_winter': 'rainfall_winter',
+        'rainfall_spring': 'rainfall_spring',
+        'rainfall_summer': 'rainfall_summer',
+        'rainfall_autumn': 'rainfall_autumn',
+        'temperature_winter': 'temperature_winter',
+        'temperature_spring': 'temperature_spring',
+        'temperature_summer': 'temperature_summer',
+        'temperature_autumn': 'temperature_autumn',
+        'temp_min': 'temp_min',
+        'temp_max': 'temp_max',
+        'sunshine_hours': 'sunshine_hours',
+        'rainy_days': 'rainy_days',
+        'frost_days': 'frost_days',
+        'hot_days': 'hot_days',
+    }
+
+    for col_out, col_in in columns_mapping.items():
+        vals = stations[col_in].values[indices]
+        valid_mask = ~np.isnan(vals)
+
+        valid_weights = base_weights * valid_mask
+        weight_sums = valid_weights.sum(axis=1, keepdims=True)
+
+        safe_weight_sums = np.where(weight_sums == 0, 1, weight_sums)
+        normalized_weights = valid_weights / safe_weight_sums
+
+        safe_vals = np.where(valid_mask, vals, 0)
+        interpolated = np.sum(normalized_weights * safe_vals, axis=1)
+
+        interpolated = np.where(weight_sums.flatten() == 0, np.nan, interpolated)
+        df[col_out] = np.round(interpolated, 2)
+
+    return df
+
+def main():
+    input_file = 'parquets/fr/base_grid.parquet'
+    output_file = 'parquets/fr/h3_weather.parquet'
+
+    df = pd.read_parquet(input_file)
+    raw_data = load_weather_data()
+    stations = process_weather_data(raw_data)
+
+    df = apply_idw_vectorized(df, stations)
+
+    for col in SCHEMA.keys():
+        if col in df.columns:
+            df[col] = df[col].astype(SCHEMA[col])
+
+    df.to_parquet(output_file, index=False)
+
+if __name__ == "__main__":
+    main()
