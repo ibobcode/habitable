@@ -13,7 +13,7 @@ def fetch_france_geometry():
 def generate_h3_grid(geojson_data, resolution=6):
     all_cells = set()
     features = geojson_data.get('features', [])
-    
+
     for feature in features:
         code = feature.get('properties', {}).get('code', '99')
         if code < '97':
@@ -21,14 +21,14 @@ def generate_h3_grid(geojson_data, resolution=6):
             if geometry:
                 cells = h3.geo_to_cells(geometry, resolution)
                 all_cells.update(cells)
-                
+
     return list(all_cells)
 
 def main():
     output_dir = 'parquets/fr'
     output_file = os.path.join(output_dir, 'base_grid.parquet')
     os.makedirs(output_dir, exist_ok=True)
-    
+
     resolution = 6
 
     geojson_data = fetch_france_geometry()
@@ -37,16 +37,16 @@ def main():
     if not h3_indices:
         raise ValueError("Erreur : Aucune cellule H3 générée. Vérifiez la structure 'features' du JSON.")
 
-    data = []
-    for h3_index in h3_indices:
-        lat, lon = h3.cell_to_latlng(h3_index)
-        data.append({
+    data = [
+        {
             'h3_index': h3_index,
-            'lat': round(lat, 6),
-            'lon': round(lon, 6)
-        })
+            'lat': round(h3.cell_to_latlng(h3_index)[0], 6),
+            'lon': round(h3.cell_to_latlng(h3_index)[1], 6),
+        }
+        for h3_index in h3_indices
+    ]
 
-    df = pd.DataFrame(data)[['h3_index', 'lat', 'lon']]
+    df = pd.DataFrame(data)  # columns inferred from dict keys: h3_index, lat, lon
 
     df['h3_index'] = df['h3_index'].astype(SCHEMA['h3_index'])
     df['lat'] = df['lat'].astype(SCHEMA['lat'])
