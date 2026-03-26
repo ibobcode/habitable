@@ -3,7 +3,7 @@ name: FR - Weather Data Update
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - 'scripts/fr/data_weather.py'
       - 'scripts/fr/schema.py'
