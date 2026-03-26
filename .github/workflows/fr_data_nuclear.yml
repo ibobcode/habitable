@@ -34,10 +34,11 @@ jobs:
       - name: Execute script
         run: python scripts/fr/data_nuclear.py
 
-      - name: Commit and push parquet
+            - name: Commit and push parquet
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add parquets/fr/h3_nuclear.parquet
-          git commit -m "auto: update h3_nuclear.parquet" || echo "No changes to commit"
+          git add parquets/fr/*.parquet
+          git commit -m "auto: update parquet data" || echo "No changes to commit"
+          git pull --rebase origin master
           git push
