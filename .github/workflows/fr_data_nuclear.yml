@@ -3,7 +3,7 @@ name: FR - Nuclear Data Update
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - 'scripts/fr/data_nuclear.py'
       - 'scripts/fr/schema.py'
