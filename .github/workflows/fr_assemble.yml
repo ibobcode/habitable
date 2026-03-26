@@ -1,15 +1,16 @@
 name: FR - Assemble and Release
 
 on:
-  workflow_run:
-    workflows: ["FR - Nuclear Data Update", "FR - Weather Data Update"]
-    types:
-      - completed
   push:
     branches:
       - main
     paths:
+      - 'parquets/fr/*.parquet'
       - 'scripts/fr/assemble.py'
+
+concurrency:
+  group: assemble-release
+  cancel-in-progress: false
 
 jobs:
   assemble-and-release:
@@ -34,7 +35,6 @@ jobs:
         run: python scripts/fr/assemble.py
 
       - name: Generate release tag
-        id: tag
         run: echo "VERSION=v$(date +'%Y.%m.%d-%H%M%S')" >> $GITHUB_ENV
 
       - name: Create Release
