@@ -11,7 +11,15 @@ def fetch_france_geometry():
 
 def generate_h3_grid(geojson_data, resolution=6):
     cells = set()
-    for feature in geojson_data.get('features', []):
+    
+    if geojson_data.get('type') == 'FeatureCollection':
+        features = geojson_data.get('features', [])
+    elif geojson_data.get('type') == 'Feature':
+        features = [geojson_data]
+    else:
+        features = []
+
+    for feature in features:
         geom = feature.get('geometry', {})
         geom_type = geom.get('type')
         if geom_type == 'Polygon':
