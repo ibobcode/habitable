@@ -4,7 +4,7 @@ import pandas as pd
 from schema import SCHEMA
 
 def fetch_france_geometry():
-    url = "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions/metropole-version-simplifiee.geojson"
+    url = "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/metropole-version-simplifiee.geojson"
     response = requests.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
