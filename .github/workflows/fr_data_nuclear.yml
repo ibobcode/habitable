@@ -8,6 +8,10 @@ on:
       - 'scripts/fr/data_nuclear.py'
       - 'scripts/fr/schema.py'
 
+concurrency:
+  group: git-push-parquets
+  cancel-in-progress: false
+
 jobs:
   generate-parquet:
     runs-on: ubuntu-latest
