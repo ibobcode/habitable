@@ -1,0 +1,46 @@
+name: FR - Assemble and Release
+
+on:
+  workflow_run:
+    workflows: ["FR - Nuclear Data Update", "FR - Weather Data Update"]
+    types:
+      - completed
+  push:
+    branches:
+      - master
+    paths:
+      - 'scripts/fr/assemble.py'
+
+jobs:
+  assemble-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute assembly script
+        run: python scripts/fr/assemble.py
+
+      - name: Generate release tag
+        id: tag
+        run: echo "VERSION=v$(date +'%Y.%m.%d-%H%M%S')" >> $GITHUB_ENV
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ env.VERSION }} france_habitable.geojson \
+            --title "France Habitable Data ${{ env.VERSION }}" \
+            --notes "Automated release of the assembled GeoJSON dataset."

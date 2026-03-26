@@ -1,0 +1,44 @@
+name: FR - Weather Data Update
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'scripts/fr/data_weather.py'
+      - 'scripts/fr/schema.py'
+
+concurrency:
+  group: git-push-parquets
+  cancel-in-progress: false
+
+jobs:
+  generate-parquet:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute script
+        run: python scripts/fr/data_weather.py
+
+            - name: Commit and push parquet
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add parquets/fr/*.parquet
+          git commit -m "auto: update parquet data" || echo "No changes to commit"
+          git pull --rebase origin master
+          git push
