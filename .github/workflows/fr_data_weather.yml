@@ -34,7 +34,7 @@ jobs:
       - name: Execute script
         run: python scripts/fr/data_weather.py
 
-            - name: Commit and push parquet
+      - name: Commit and push parquet
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
