@@ -11,28 +11,20 @@ def fetch_france_geometry():
 
 def generate_h3_grid(geojson_data, resolution=6):
     cells = set()
-    
-    if geojson_data.get('type') == 'FeatureCollection':
-        features = geojson_data.get('features', [])
-    elif geojson_data.get('type') == 'Feature':
-        features = [geojson_data]
-    else:
-        features = []
+    geom = geojson_data.get('geometry', {})
+    geom_type = geom.get('type')
 
-    for feature in features:
-        geom = feature.get('geometry', {})
-        geom_type = geom.get('type')
-        if geom_type == 'Polygon':
-            polygons = [geom['coordinates']]
-        elif geom_type == 'MultiPolygon':
-            polygons = geom['coordinates']
-        else:
-            continue
-        for poly_coords in polygons:
-            exterior = [(lat, lon) for lon, lat in poly_coords[0]]
-            holes = [[(lat, lon) for lon, lat in hole] for hole in poly_coords[1:]]
-            h3_poly = h3.Polygon(exterior, *holes)
-            cells.update(h3.polygon_to_cells(h3_poly, resolution))
+    if geom_type == 'MultiPolygon':
+        polygons = geom.get('coordinates', [])
+    elif geom_type == 'Polygon':
+        polygons = [geom.get('coordinates', [])]
+    else:
+        return list(cells)
+
+    for polygon_coords in polygons:
+        geo = {"type": "Polygon", "coordinates": polygon_coords}
+        cells.update(h3.geo_to_cells(geo, resolution))
+        
     return list(cells)
 
 def main():
@@ -41,6 +33,9 @@ def main():
 
     geojson_data = fetch_france_geometry()
     h3_indices = generate_h3_grid(geojson_data, resolution)
+
+    if not h3_indices:
+        raise ValueError("Grid generation failed: 0 cells returned.")
 
     data = []
     for h3_index in h3_indices:
@@ -51,7 +46,7 @@ def main():
             'lon': round(lon, 6)
         })
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data, columns=['h3_index', 'lat', 'lon'])
 
     df['h3_index'] = df['h3_index'].astype(SCHEMA['h3_index'])
     df['lat'] = df['lat'].astype(SCHEMA['lat'])
