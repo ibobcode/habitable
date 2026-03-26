@@ -40,5 +40,5 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add parquets/fr/*.parquet
           git commit -m "auto: update parquet data" || echo "No changes to commit"
-          git pull --rebase origin master
-          git push
+          git pull --rebase origin main
+          git pushorigin main
