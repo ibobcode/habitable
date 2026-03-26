@@ -1,0 +1,35 @@
+name: FR - Base Grid Generation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-base-grid:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute base grid script
+        run: python scripts/fr/base_grid.py
+
+      - name: Commit and push base grid
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p parquets/fr
+          git add parquets/fr/base_grid.parquet
+          git commit -m "auto: generate base_grid.parquet" || echo "No changes to commit"
+          git push
