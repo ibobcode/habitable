@@ -34,6 +34,20 @@ jobs:
       - name: Execute assembly script
         run: python scripts/fr/assemble.py
 
+      - name: Copy GeoJSON to public
+        run: |
+          mkdir -p public/data
+          cp france_habitable.geojson public/data/france_habitable.geojson
+
+      - name: Commit and push public data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add public/data/france_habitable.geojson
+          git commit -m "auto: update france_habitable.geojson" || echo "No changes to commit"
+          git pull --rebase origin main
+          git push origin main
+
       - name: Generate release tag
         run: echo "VERSION=v$(date +'%Y.%m.%d-%H%M%S')" >> $GITHUB_ENV
 
