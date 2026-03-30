@@ -12,7 +12,8 @@
     "orange": { "min": [254, 230, 206], "max": [230, 85, 13] },
     "yellow": { "min": [255, 247, 188], "max": [254, 196, 79] },
     "cyan": { "min": [224, 243, 248], "max": [0, 162, 162] },
-    "red": { "min": [254, 224, 210], "max": [222, 45, 38] }
+    "red": { "min": [254, 224, 210], "max": [222, 45, 38] },
+    "purple": { "min": [242, 240, 247], "max": [117, 107, 177] }
   },
   "categories": [
     {
@@ -20,6 +21,13 @@
       "label": "Nucléaire",
       "layers": [
         { "id": "nuclear_plant_distance_km", "label": "Distance centrale nucléaire", "color": "green", "invert": false }
+      ]
+    },
+    {
+      "id": "immobilier",
+      "label": "Immobilier",
+      "layers": [
+        { "id": "dvf_price_median", "label": "Prix médian au m²", "color": "purple", "invert": true }
       ]
     },
     {
@@ -52,6 +60,12 @@
         { "max": 100, "color": "#f97316", "label": "20 - 100 km" },
         { "max": null, "color": "#22c55e", "label": "> 100 km" }
       ]
+    },
+    "dvf_price_median": {
+      "type": "clamped",
+      "domain": [1000, 6000],
+      "labels": { "min": "< 1 000", "max": "> 6 000" },
+      "unit": "€/m²"
     },
     "rainfall": {
       "type": "clamped",
