@@ -16,6 +16,7 @@ def main():
     sources = [
         'h3_nuclear.parquet',
         'h3_weather.parquet',
+        'h3_DVF.parquet',
     ]
 
     df = pd.read_parquet(base_file)
