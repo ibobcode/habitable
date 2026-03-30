@@ -1,0 +1,105 @@
+{
+  "seasons": ["winter", "spring", "summer", "autumn"],
+  "seasonLabels": {
+    "winter": "hiver",
+    "spring": "printemps",
+    "summer": "été",
+    "autumn": "automne"
+  },
+  "colors": {
+    "green": { "min": [229, 245, 224], "max": [49, 163, 84] },
+    "blue": { "min": [222, 235, 247], "max": [49, 130, 189] },
+    "orange": { "min": [254, 230, 206], "max": [230, 85, 13] },
+    "yellow": { "min": [255, 247, 188], "max": [254, 196, 79] },
+    "cyan": { "min": [224, 243, 248], "max": [0, 162, 162] },
+    "red": { "min": [254, 224, 210], "max": [222, 45, 38] }
+  },
+  "categories": [
+    {
+      "id": "nucleaire",
+      "label": "Nucléaire",
+      "layers": [
+        { "id": "nuclear_plant_distance_km", "label": "Distance centrale nucléaire", "color": "green", "invert": false }
+      ]
+    },
+    {
+      "id": "meteo_saison",
+      "label": "Météo saisonnière",
+      "isSeasonal": true,
+      "layers": [
+        { "id": "rainfall", "label": "Précipitations", "color": "blue", "invert": true },
+        { "id": "temperature", "label": "Température moyenne", "color": "orange", "invert": false }
+      ]
+    },
+    {
+      "id": "meteo_annuelle",
+      "label": "Météo annuelle",
+      "layers": [
+        { "id": "sunshine_hours", "label": "Insolation", "color": "yellow", "invert": false },
+        { "id": "rainy_days", "label": "Jours de pluie", "color": "blue", "invert": false },
+        { "id": "frost_days", "label": "Jours de gel", "color": "cyan", "invert": false },
+        { "id": "hot_days", "label": "Jours de chaleur", "color": "red", "invert": false },
+        { "id": "temp_min", "label": "Température min", "color": "cyan", "invert": false },
+        { "id": "temp_max", "label": "Température max", "color": "red", "invert": false }
+      ]
+    }
+  ],
+  "legendsConfig": {
+    "nuclear_plant_distance_km": {
+      "type": "discrete",
+      "steps": [
+        { "max": 20, "color": "#ef4444", "label": "< 20 km (Zone PPI)" },
+        { "max": 100, "color": "#f97316", "label": "20 - 100 km" },
+        { "max": null, "color": "#22c55e", "label": "> 100 km" }
+      ]
+    },
+    "rainfall": {
+      "type": "clamped",
+      "domain": [0, 300],
+      "labels": { "min": "0", "max": "> 300" },
+      "unit": "mm"
+    },
+    "temperature": {
+      "type": "clamped",
+      "domain": [0, 25],
+      "labels": { "min": "< 0", "max": "> 25" },
+      "unit": "°C"
+    },
+    "sunshine_hours": {
+      "type": "clamped",
+      "domain": [1500, 2800],
+      "labels": { "min": "< 1500", "max": "> 2800" },
+      "unit": "h"
+    },
+    "rainy_days": {
+      "type": "clamped",
+      "domain": [50, 150],
+      "labels": { "min": "< 50", "max": "> 150" },
+      "unit": "j"
+    },
+    "frost_days": {
+      "type": "clamped",
+      "domain": [0, 100],
+      "labels": { "min": "0", "max": "> 100" },
+      "unit": "j"
+    },
+    "hot_days": {
+      "type": "clamped",
+      "domain": [0, 50],
+      "labels": { "min": "0", "max": "> 50" },
+      "unit": "j"
+    },
+    "temp_min": {
+      "type": "clamped",
+      "domain": [-10, 10],
+      "labels": { "min": "< -10", "max": "> 10" },
+      "unit": "°C"
+    },
+    "temp_max": {
+      "type": "clamped",
+      "domain": [15, 35],
+      "labels": { "min": "< 15", "max": "> 35" },
+      "unit": "°C"
+    }
+  }
+}
