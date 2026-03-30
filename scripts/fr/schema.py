@@ -19,4 +19,5 @@ SCHEMA = {
     'rainy_days': float,
     'frost_days': float,
     'hot_days': float,
+    'dvf_price_median': float,
 }
