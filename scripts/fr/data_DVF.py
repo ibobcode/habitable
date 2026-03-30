@@ -43,7 +43,7 @@ def assign_h3(df, resolution=6):
 
 def main():
     input_file = 'parquets/fr/base_grid.parquet'
-    output_file = 'parquets/fr/h3_dvf.parquet'
+    output_file = 'parquets/fr/h3_DVF.parquet'
 
     base_df = pd.read_parquet(input_file)[['h3_index']]
 
